@@ -50,6 +50,55 @@ class trackNeedleAngle:
         plt.imshow(plot_map)
         plt.show()
 
+        # Find the rightmost green pixel after displaying the image
+        rightmost_point = None
+        for contour in contours:
+            if contour.size > 0:
+                rightmost = tuple(contour[contour[:, :, 0].argmax()][0])
+                if rightmost_point is None or rightmost[0] > rightmost_point[0]:
+                    rightmost_point = rightmost
+
+        if rightmost_point:
+            print(f"Rightmost green pixel: {rightmost_point}")
+
+        # Find the leftmost point with y within ±5 of rightmost_point
+        leftmost_point = None
+        if rightmost_point:
+            for contour in contours:
+                for point in contour:
+                    x, y = point[0]
+                    if abs(y - rightmost_point[1]) <= 5:
+                        if leftmost_point is None or x < leftmost_point[0]:
+                            leftmost_point = (x, y)
+
+            print(f"Rightmost green pixel: {rightmost_point}")
+            if leftmost_point:
+                print(f"Leftmost green pixel with y ±5 of rightmost: {leftmost_point}")
+            else:
+                print("No leftmost point found within the y-range.")
+
+        absolute_leftmost_point = None
+        for contour in contours:
+            for point in contour:
+                x, y = point[0]
+                if absolute_leftmost_point is None or x < absolute_leftmost_point[0]:
+                    absolute_leftmost_point = (x, y)
+
+        if absolute_leftmost_point:
+            print(f"Absolute leftmost green pixel: {absolute_leftmost_point}")
+
+        # Visualize all points on the plot_map
+        if rightmost_point:
+            cv2.circle(plot_map, rightmost_point, 5, (255, 0, 0), -1)  # Rightmost in blue
+        if leftmost_point:
+            cv2.circle(plot_map, leftmost_point, 5, (0, 0, 255), -1)  # Leftmost within y ±5 in red
+        if absolute_leftmost_point:
+            cv2.circle(plot_map, absolute_leftmost_point, 5, (0, 255, 255), -1)  # Absolute leftmost in yellow
+
+        # Display updated plot_map with points
+        plt.imshow(plot_map)
+        plt.show()
+
 def main():
     tracker = trackNeedleAngle()
     tracker.track_angle()
