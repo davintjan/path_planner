@@ -15,9 +15,17 @@ from generate_path import DubinsPathPlanner
 class trackNeedle(DubinsPathPlanner):
     def __init__(self, turn_radius, travel_distance, straight_step_distance, goal_threshold):
         # Initialize video capture once
-        self.video = cv2.VideoCapture(0)
+        self.video = cv2.VideoCapture(2)
         self.video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        ret, frame = self.video.read()
+        if ret:
+            cv2.imshow("init Frame", frame)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        else:
+            print("failed to cap")
 
         # Initialize variables
         self.needle_range = [([11, 36, 54], [23, 166, 107])]
@@ -35,26 +43,26 @@ class trackNeedle(DubinsPathPlanner):
         rospy.init_node('needle_tip_tracker', anonymous=True)
 
         # Auto calibrate, get first and second positions
-        first_pos_msg = Float32()
-        first_pos_msg.data = 0.0
-        second_pos_msg = Float32()
-        second_pos_msg.data = 10000.0
-
-        # Move needle to start
-        self.pub_target_pos.publish(first_pos_msg)
-        
-        # Check pixel position
-        first_pixel_pos = self.get_starting_point() 
-        print('first_pixel_position')
-        print(first_pixel_pos)
-
-        # Move needle to end
-        self.pub_target_pos.publish(second_pos_msg)
-
-        # Check pixel position
-        second_pixel_pos = self.get_starting_point() 
-        print('second_pixel_position')
-        print(second_pixel_pos)
+        # first_pos_msg = Float32()
+        # first_pos_msg.data = 0.0
+        # second_pos_msg = Float32()
+        # second_pos_msg.data = 10000.0
+        #
+        # # Move needle to start
+        # self.pub_target_pos.publish(first_pos_msg)
+        #
+        # # Check pixel position
+        # first_pixel_pos = self.get_starting_point()
+        # print('first_pixel_position')
+        # print(first_pixel_pos)
+        #
+        # # Move needle to end
+        # self.pub_target_pos.publish(second_pos_msg)
+        #
+        # # Check pixel position
+        # second_pixel_pos = self.get_starting_point()
+        # print('second_pixel_position')
+        # print(second_pixel_pos)
 
 
     def calculate_angle(self, x1, y1, x2, y2, x3, y3, x4, y4):
@@ -111,9 +119,9 @@ class trackNeedle(DubinsPathPlanner):
             # cv2.rectangle(threshold_frame, (bbox[1], bbox[0]), (bbox[1] + w, bbox[0] + h), color, thickness)
 
             # Display the image
-            cv2.imshow('Image with Bounding Box', threshold_frame)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            # cv2.imshow('Image with Bounding Box', threshold_frame)
+            # cv2.waitKey(0)
+            # cv2.destroyAllWindows()
             
             print('bbox')
             print(bbox)
@@ -175,8 +183,8 @@ class trackNeedle(DubinsPathPlanner):
             cv2.drawContours(plot_map, [contour], -1, (0, 255, 0), -1)
 
         # Display the plot map
-        plt.imshow(plot_map)
-        plt.show()
+        # plt.imshow(plot_map)
+        # plt.show()
 
         # Find the rightmost green pixel after displaying the image
         rightmost_point = None
@@ -224,8 +232,8 @@ class trackNeedle(DubinsPathPlanner):
             cv2.circle(plot_map, absolute_leftmost_point, 5, (0, 255, 255), -1)  # Absolute leftmost in yellow
         
         # Display updated plot_map with points
-        plt.imshow(plot_map)
-        plt.show()
+        # plt.imshow(plot_map)
+        # plt.show()
         
         return rightmost_point, leftmost_point, absolute_leftmost_point
     
