@@ -28,8 +28,8 @@ class trackNeedleAngle:
         frame = np.flipud(frame)
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV))
-        # plt.show()
+        plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2HSV))
+        plt.show()
 
         lower_bound = np.array(self.needle_range[0][0])
         upper_bound = np.array(self.needle_range[0][1])
@@ -50,54 +50,56 @@ class trackNeedleAngle:
         plt.imshow(plot_map)
         plt.show()
 
-        # Find the rightmost green pixel after displaying the image
-        rightmost_point = None
+        # Find the **bottommost** point (was rightmost before)
+        bottommost_point = None
         for contour in contours:
             if contour.size > 0:
-                rightmost = tuple(contour[contour[:, :, 0].argmax()][0])
-                if rightmost_point is None or rightmost[0] > rightmost_point[0]:
-                    rightmost_point = rightmost
+                bottommost = tuple(contour[contour[:, :, 1].argmax()][0])  # Find the highest y-value
+                if bottommost_point is None or bottommost[1] > bottommost_point[1]:  # Compare y-coordinates
+                    bottommost_point = bottommost
 
-        if rightmost_point:
-            print(f"Rightmost green pixel: {rightmost_point}")
+        if bottommost_point:
+            print(f"Bottommost green pixel: {bottommost_point}")
 
-        # Find the leftmost point with y within ±5 of rightmost_point
-        leftmost_point = None
-        if rightmost_point:
+        # Find the **topmost** point with x within ±5 of bottommost x (was leftmost before)
+        topmost_point = None
+        if bottommost_point:
             for contour in contours:
                 for point in contour:
                     x, y = point[0]
-                    if abs(y - rightmost_point[1]) <= 5:
-                        if leftmost_point is None or x < leftmost_point[0]:
-                            leftmost_point = (x, y)
+                    if abs(x - bottommost_point[0]) <= 5:  # Same x-range constraint
+                        if topmost_point is None or y < topmost_point[1]:  # Find the lowest y-value
+                            topmost_point = (x, y)
 
-            print(f"Rightmost green pixel: {rightmost_point}")
-            if leftmost_point:
-                print(f"Leftmost green pixel with y ±5 of rightmost: {leftmost_point}")
+            print(f"Bottommost green pixel: {bottommost_point}")
+            if topmost_point:
+                print(f"Topmost green pixel with x ±5 of bottommost: {topmost_point}")
             else:
-                print("No leftmost point found within the y-range.")
+                print("No topmost point found within the x-range.")
 
-        absolute_leftmost_point = None
+        # Find the **absolute topmost** point (was absolute leftmost before)
+        absolute_topmost_point = None
         for contour in contours:
             for point in contour:
                 x, y = point[0]
-                if absolute_leftmost_point is None or x < absolute_leftmost_point[0]:
-                    absolute_leftmost_point = (x, y)
+                if absolute_topmost_point is None or y < absolute_topmost_point[1]:  # Find the lowest y-value
+                    absolute_topmost_point = (x, y)
 
-        if absolute_leftmost_point:
-            print(f"Absolute leftmost green pixel: {absolute_leftmost_point}")
+        if absolute_topmost_point:
+            print(f"Absolute topmost green pixel: {absolute_topmost_point}")
 
-        # Visualize all points on the plot_map
-        if rightmost_point:
-            cv2.circle(plot_map, rightmost_point, 5, (255, 0, 0), -1)  # Rightmost in blue
-        if leftmost_point:
-            cv2.circle(plot_map, leftmost_point, 5, (0, 0, 255), -1)  # Leftmost within y ±5 in red
-        if absolute_leftmost_point:
-            cv2.circle(plot_map, absolute_leftmost_point, 5, (0, 255, 255), -1)  # Absolute leftmost in yellow
+        # Visualize points on the plot_map
+        if bottommost_point:
+            cv2.circle(plot_map, bottommost_point, 5, (255, 0, 0), -1)  # Bottommost in blue
+        if topmost_point:
+            cv2.circle(plot_map, topmost_point, 5, (0, 0, 255), -1)  # Topmost within x ±5 in red
+        if absolute_topmost_point:
+            cv2.circle(plot_map, absolute_topmost_point, 5, (0, 255, 255), -1)  # Absolute topmost in yellow
 
         # Display updated plot_map with points
         plt.imshow(plot_map)
         plt.show()
+
 
 def main():
     tracker = trackNeedleAngle()

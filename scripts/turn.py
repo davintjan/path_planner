@@ -16,7 +16,7 @@ class executeTurn:
         self.needle_tip_angle = None
 
         # Subscriber for needle tip angle
-        rospy.Subscriber('/needle_tip/angle', Float32MultiArray, self.needle_angle_callback)
+        rospy.Subscriber('/needle_tip/filtered_angle', Float32MultiArray, self.needle_angle_callback)
 
         # Publisher for target position
         self.target_pos_pub_2 = rospy.Publisher('/targetPos2', Float32, queue_size=10)
@@ -50,13 +50,12 @@ class executeTurn:
             rospy.loginfo(f"Needle Tip: {self.needle_tip_angle}, Target: {self.target}")
 
             # Publish incremented target position
-            self.publish_move_command(10.0)
-            rospy.sleep(2)  # Allow time for movement
+            self.publish_move_command(1.0)
+            rospy.sleep(0.5)  # Allow time for movement
 
             # Wait for updated needle tip angle
             if self.needle_tip_angle is None:
                 rospy.logwarn("Waiting for needle tip angle...")
-                rospy.sleep(2)
 
         rospy.loginfo("Path executed successfully, needle reached the goal")
 

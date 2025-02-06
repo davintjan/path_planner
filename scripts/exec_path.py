@@ -48,14 +48,14 @@ class executePath:
         for i, command in enumerate(self.path_strings):
             if command == "step":
                 rospy.loginfo(f"Executing step: target {self.path[i]}")
-                rospy.sleep(4)
+                rospy.sleep(2)
                 rospy.loginfo(f"NEEDLE TIP COORDS ------------------------- {self.needle_tip_coords[0]}")
-                while self.needle_tip_coords[0] > self.path[i][0] - allowed_path_error:
+                while self.needle_tip_coords[1] > self.path[i][1] - allowed_path_error:
                     rospy.loginfo(f"Needle Tip: {self.needle_tip_coords}, Target: {self.path[i]}")
 
                     # Publish incremented target position
                     self.publish_move_command(100.0)
-                    rospy.sleep(2)  # Allow time for movement
+                    rospy.sleep(1)  # Allow time for movement
 
                     # Wait for updated needle tip coordinates
                     if self.needle_tip_coords is None:
@@ -67,11 +67,14 @@ class executePath:
                 rospy.loginfo(f"Updated path: {path_copy}")
 
                 path_taken.append("step")
-                rospy.sleep(4)
+                rospy.sleep(2)
 
             elif command == "turn":
                 rospy.loginfo("Executing turn command")
                 path_taken.append("turn")
+                rospy.loginfo(f"Path Taken: {path_taken}")
+                print(self.path)
+                break
 
             rospy.loginfo(f"Path Taken: {path_taken}")
 
@@ -80,10 +83,10 @@ class executePath:
 
 def main():
     # Initialize parameters
-    start = (457, 214)  # Starting position of the needle
+    start = (252, 117)  # Starting position of the needle, we can use this by simply subscribing to rostopic needle_tip
     allowed_path_error = 2  # Allowed needle tip error
-    turn_radius = 8  # Turn radius for needle path planning
-    travel_distance = 3  # Travel distance for needle path planning
+    turn_radius = 3  # Turn radius for needle path planning
+    travel_distance = 10  # Travel distance for needle path planning
     straight_step_distance = 20  # Distance to move straight in pixel space
     goal_threshold = 50  # Threshold distance for successful goal reach
 

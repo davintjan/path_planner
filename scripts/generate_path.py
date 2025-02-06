@@ -15,7 +15,7 @@ class DubinsPathPlanner:
         self.start = np.array(start)
         self.path = [self.start]
         self.path_strings = []
-        self.angle = 0 # Initial angle in radians (relative to the y-axis)
+        self.angle = 0 # Initial angle in radians (relative to the x-axis)
         self.obstacles = []
         self.turn_radius = turn_radius  # Minimum turn radius
         self.travel_distance = travel_distance  # Minimum turn radius
@@ -87,15 +87,16 @@ class DubinsPathPlanner:
     def move_straight(self, distance):
         if not self.turn_made:
             # import ipdb; ipdb.set_trace()
-            new_y_position = self.path[-1][0] - distance
-            new_position = np.array([new_y_position, self.path[-1][1]])
+            new_y_position = self.path[-1][1] - distance
+            new_x_position = self.path[-1][0]
+            new_position = np.array([new_x_position, new_y_position])
             # if self.arduino:
             #     self.arduino.write(b'f')  # Send the byte 'f' to Arduino, for future reference, you can send 'u' to turn right, 'i' to turn left
             #     time.sleep(0.05) # Ensure you pause half a second to let f truly runs
             #     # You can make this as loop (change distance into a number of f (one f is 0.5 mm), then loop over)
             #     print("Sent 'f' to Arduino")
         else:
-            dy = np.cos(np.deg2rad(60)) #hard coded for 30 deg
+            dy = -np.cos(np.deg2rad(60)) #hard coded for 30 deg
             dx = -np.sin(np.deg2rad(60))
             new_position = self.path[-1] + distance * np.array([dx, dy])
 
@@ -117,9 +118,9 @@ class DubinsPathPlanner:
         angle_step = angle_rad / steps
         for i in range(steps):
             self.angle += angle_step if angle_deg > 0 else -angle_step
-            dy = self.travel_distance * np.sin(self.angle)
-            dx = -self.travel_distance * np.cos(self.angle)  # Negative to turn along negative x direction
-            new_position = self.path[-1] + np.array([dx, dy])
+            dy = self.travel_distance * np.cos(self.angle)
+            dx = self.travel_distance * np.sin(self.angle)  # Negative to turn along negative x direction
+            new_position = self.path[-1] - np.array([dx, dy])
             if not self.check_collision_along_path(self.path[-1], new_position):
                 self.position_stack.append(self.path[-1])  # Push current position to stack
                 self.path.append(new_position)
@@ -156,16 +157,19 @@ class DubinsPathPlanner:
             self.turn_made = False  # Allow turning again
 
     def generate_path(self):
-        max_iterations = 50000  # Set a reasonable maximum number of iterations
+        max_iterations = 500  # Set a reasonable maximum number of iterations
         with tqdm(total=max_iterations, desc="Generating Path") as pbar:
             while np.linalg.norm(self.path[-1] - self.goal) > self.goal_threshold: #how close to goal
                 direction_to_goal = self.goal - self.path[-1]
-                angle_to_goal = np.arctan2(direction_to_goal[0], direction_to_goal[1])
+                print(direction_to_goal)
+                angle_to_goal = np.arctan(direction_to_goal[0]/direction_to_goal[1])
                 angle_diff = angle_to_goal - self.angle
-                if not self.try_turn and np.abs(angle_diff) > np.deg2rad(20) and np.abs(angle_diff) <= np.deg2rad(55):
+                print(np.rad2deg(angle_to_goal))
+                print("-------")
+                if not self.try_turn and np.abs(angle_diff) > np.deg2rad(60) and np.abs(angle_diff) <= np.deg2rad(75):
                     print("trying turn")
                     if not self.turn_made:
-                        self.turn_arc(30)
+                        self.turn_arc(60)
                 else:
                     print("move straight")
                     self.move_straight(self.straight_step_distance)
@@ -176,11 +180,11 @@ class DubinsPathPlanner:
                 if pbar.n >= max_iterations:
                     print("Reached maximum iterations, failed, stopping path generation.")
                     break
-        print(self.path)
+        # print(self.path)
         print("-------------------")
-        print(self.path[-1])
-        print(self.goal)
-        print(np.linalg.norm(self.path[-1] - self.goal))
+        # print(self.path[-1])
+        # print(self.goal)
+        # print(np.linalg.norm(self.path[-1] - self.goal))
         print("Path generated, successfully reached goal.")
 
 
@@ -230,7 +234,7 @@ class DubinsPathPlanner:
     def plot_path(self):
         path = np.array(self.path)
         frame = np.flipud(self.frame)
-        print("Path commands: ", self.path_strings)
+        # print("Path commands: ", self.path_strings)
 
         plt.plot(path[:, 0], path[:, 1], marker='o')
         plt.plot(self.start[0], self.start[1], 'go', label='Start')
@@ -261,7 +265,7 @@ class DubinsPathPlanner:
     def plot_path_updated(self, path):
         path = np.array(path)
         frame = np.flipud(self.frame)
-        print("Path commands: ", self.path_strings)
+        # print("Path commands: ", self.path_strings)
 
         plt.plot(path[:, 0], path[:, 1], marker='o')
         plt.plot(path[0, 0], path[0, 1], 'go', label='Start')
@@ -290,18 +294,18 @@ class DubinsPathPlanner:
 
 
 def main():
-    start = (504, 223) #where the needle enters the frame (need to calibrate)
+    start = (257, 289) #where the needle enters the frame (need to calibrate)
     allowed_path_error = 50 #allowed needle tip error (need to calibrate)
-    turn_radius = 5 #turn radius for needle path planning, try to match this with the real needle *in pixel space* (need to calibrate)
+    turn_radius = 3 #turn radius for needle path planning, try to match this with the real needle *in pixel space* (need to calibrate)
     travel_distance = 15 #another turning parameter for needle path planning, try to match this with real needle *in pixel space* (need to calibrate)
-    straight_step_distance = 15 #distance to move straight in pixel space (need to calibrate)
+    straight_step_distance = 30 #distance to move straight in pixel space (need to calibrate)
     goal_threshold = 40 #the distance the needle needs to be near the goal to be considered successful (maybe need to calibrate)
     planner = DubinsPathPlanner(start, turn_radius, travel_distance, straight_step_distance, goal_threshold)
     planner.initial_obstacle_goal_detection()
     planner.generate_path()
     planner.plot_path()
 
-    print(planner.path_strings)
+    # print(planner.path_strings)
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,7 @@ import serial
 import time
 from std_msgs.msg import Float32, Float32MultiArray
 from generate_path import DubinsPathPlanner
+from collections import deque
 
 """ THIS CLASS IS PURELY USED TO TRACK THE NEEDLE TIP AND PUBLISH THE POSITION TO ROSTOPIC """
 
@@ -28,10 +29,12 @@ class trackNeedle(DubinsPathPlanner):
             print("failed to cap")
 
         # Initialize variables
+        self.angle_buffer = deque(maxlen=10)
         self.needle_range = [([11, 36, 54], [23, 166, 107])]
         self.init_tracker = True  # Ensure tracker initialization is handled
         self.pub_centroid = rospy.Publisher('/needle_tip/centroid', Float32MultiArray, queue_size=10)
         self.pub_angle = rospy.Publisher('/needle_tip/angle', Float32MultiArray, queue_size=10)
+        self.pub_filtered_angle = rospy.Publisher('/needle_tip/filtered_angle', Float32MultiArray, queue_size=10)
         self.pub_target_pos = rospy.Publisher('/targetPos1', Float32, queue_size=10)
         start = self.get_starting_point()
 
@@ -87,7 +90,7 @@ class trackNeedle(DubinsPathPlanner):
         angle_deg = np.degrees(angle_rad)
 
         return angle_deg
-    
+
     def get_angle(self, p1, p2, p3):
         return self.calculate_angle(p1[1], p1[0], p2[1], p2[0], p2[1], p2[0], p3[1], p3[0])
 
@@ -122,7 +125,7 @@ class trackNeedle(DubinsPathPlanner):
             # cv2.imshow('Image with Bounding Box', threshold_frame)
             # cv2.waitKey(0)
             # cv2.destroyAllWindows()
-            
+
             print('bbox')
             print(bbox)
 
@@ -154,7 +157,7 @@ class trackNeedle(DubinsPathPlanner):
         self.pub_centroid.publish(centroid_msg)
 
         return centroid
-    
+
     def track_three_points(self):
         for _ in range(10): #cycle through 10 frames and process the 10th frame
             ret, frame = self.video.read()
@@ -173,7 +176,7 @@ class trackNeedle(DubinsPathPlanner):
 
         # Filter ROI: keep only the range x = 144 to x = 477
         roi_mask = np.zeros_like(mask_obstacle)
-        roi_mask[:400, 300:450] = 255  # Unmask the desired region
+        roi_mask[100:400, :420] = 255  # Unmask the desired region
         mask_obstacle = cv2.bitwise_and(mask_obstacle, mask_obstacle, mask=roi_mask)
 
         # Find contours
@@ -186,74 +189,93 @@ class trackNeedle(DubinsPathPlanner):
         # plt.imshow(plot_map)
         # plt.show()
 
-        # Find the rightmost green pixel after displaying the image
-        rightmost_point = None
+        # Find the **bottommost** point (was rightmost before)
+        bottommost_point = None
         for contour in contours:
             if contour.size > 0:
-                rightmost = tuple(contour[contour[:, :, 0].argmax()][0])
-                if rightmost_point is None or rightmost[0] > rightmost_point[0]:
-                    rightmost_point = rightmost
+                bottommost = tuple(contour[contour[:, :, 1].argmax()][0])  # Find the highest y-value
+                if bottommost_point is None or bottommost[1] > bottommost_point[1]:  # Compare y-coordinates
+                    bottommost_point = bottommost
 
-        if rightmost_point:
-            print(f"Rightmost green pixel: {rightmost_point}")
+        if bottommost_point:
+            print(f"Bottommost green pixel: {bottommost_point}")
 
-        # Find the leftmost point with y within ±5 of rightmost_point
-        leftmost_point = None
-        if rightmost_point:
+        # Find the **topmost** point with x within ±5 of bottommost x (was leftmost before)
+        topmost_point = None
+        if bottommost_point:
             for contour in contours:
                 for point in contour:
                     x, y = point[0]
-                    if abs(y - rightmost_point[1]) <= 5:
-                        if leftmost_point is None or x < leftmost_point[0]:
-                            leftmost_point = (x, y)
+                    if abs(x - bottommost_point[0]) <= 5:  # Same x-range constraint
+                        if topmost_point is None or y < topmost_point[1]:  # Find the lowest y-value
+                            topmost_point = (x, y)
 
-            print(f"Rightmost green pixel: {rightmost_point}")
-            if leftmost_point:
-                print(f"Leftmost green pixel with y ±5 of rightmost: {leftmost_point}")
+            print(f"Bottommost green pixel: {bottommost_point}")
+            if topmost_point:
+                print(f"Topmost green pixel with x ±5 of bottommost: {topmost_point}")
             else:
-                print("No leftmost point found within the y-range.")
+                print("No topmost point found within the x-range.")
 
-        absolute_leftmost_point = None
+        # Find the **absolute topmost** point (was absolute leftmost before)
+        absolute_topmost_point = None
         for contour in contours:
             for point in contour:
                 x, y = point[0]
-                if absolute_leftmost_point is None or x < absolute_leftmost_point[0]:
-                    absolute_leftmost_point = (x, y)
+                if absolute_topmost_point is None or y < absolute_topmost_point[1]:  # Find the lowest y-value
+                    absolute_topmost_point = (x, y)
 
-        if absolute_leftmost_point:
-            print(f"Absolute leftmost green pixel: {absolute_leftmost_point}")
+        if absolute_topmost_point:
+            print(f"Absolute topmost green pixel: {absolute_topmost_point}")
 
-        # Visualize all points on the plot_map
-        if rightmost_point:
-            cv2.circle(plot_map, rightmost_point, 5, (255, 0, 0), -1)  # Rightmost in blue
-        if leftmost_point:
-            cv2.circle(plot_map, leftmost_point, 5, (0, 0, 255), -1)  # Leftmost within y ±5 in red
-        if absolute_leftmost_point:
-            cv2.circle(plot_map, absolute_leftmost_point, 5, (0, 255, 255), -1)  # Absolute leftmost in yellow
-        
+        # Visualize points on the plot_map
+        if bottommost_point:
+            cv2.circle(plot_map, bottommost_point, 5, (255, 0, 0), -1)  # Bottommost in blue
+        if topmost_point:
+            cv2.circle(plot_map, topmost_point, 5, (0, 0, 255), -1)  # Topmost within x ±5 in red
+        if absolute_topmost_point:
+            cv2.circle(plot_map, absolute_topmost_point, 5, (0, 255, 255), -1)  # Absolute topmost in yellow
+
         # Display updated plot_map with points
         # plt.imshow(plot_map)
         # plt.show()
-        
-        return rightmost_point, leftmost_point, absolute_leftmost_point
-    
+
+        return bottommost_point, topmost_point, absolute_topmost_point
+
     def track_angle(self):
-        rightmost_point, leftmost_point, absolute_leftmost_point = self.track_three_points()
+        bottommost_point, topmost_point, absolute_topmost_point = self.track_three_points()
         # Publish centroid to ROS topic
+        # Ensure valid points before calculating angle
+        if not bottommost_point or not topmost_point or not absolute_topmost_point:
+            rospy.logwarn("Skipping angle calculation due to missing points.")
+            return None
+
+        angle = self.get_angle(bottommost_point, topmost_point, absolute_topmost_point)
+
+        # Handle NaN values
+        # if np.isnan(angle):
+        #     rospy.logwarn("Calculated angle is NaN. Skipping publishing.")
+        #     return None
         angle_msg = Float32MultiArray()
-        angle = self.get_angle(rightmost_point, leftmost_point, absolute_leftmost_point)
         angle = angle if angle == angle else 0
         angle_msg.data = [angle]
         self.pub_angle.publish(angle_msg)
+        if angle is not None:
+            self.angle_buffer.append(angle)
+            filtered_angle = sum(self.angle_buffer) / len(self.angle_buffer)
+
+            filtered_angle_msg = Float32MultiArray()
+            filtered_angle_msg.data = [filtered_angle]
+            self.pub_filtered_angle.publish(filtered_angle_msg)
 
         print(f"Tracked Needle Angle Position: {angle}")
+        print(f"Tracked Filtered Needle Angle Position: {filtered_angle}")
 
-        return angle
-    
+        return angle, filtered_angle
+
     def get_starting_point(self):
         _, _, absolute_leftmost_point = self.track_three_points()
         return absolute_leftmost_point
-    
+
 
 def main():
     # start = (320, 180)  # Where the needle enters the frame (need to calibrate)
@@ -271,7 +293,8 @@ def main():
             centroid = track.track_needle()
             angle = track.track_angle()
             print(f"Tracked Needle Tip Position: {centroid}")
-            print(f"Tracked Needle Angle Position: {angle}")
+            if angle is not None:
+                print(f"Tracked Needle Angle Position: {angle}")
         except Exception as e:
             rospy.logerr(f"Error: {e}")
             break
