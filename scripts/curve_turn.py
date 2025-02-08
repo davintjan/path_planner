@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
+import time
 from std_msgs.msg import Float32, Float32MultiArray
+import cv2
 import matplotlib.pyplot as plt
 """ Go to point xy """
 
@@ -55,7 +57,7 @@ class executeCurveTurn:
             rospy.logwarn("Received empty needle angle data!")
 
     def publish_move_command(self, increment):
-        """Publish a movement command to /targetPos2."""
+        """Publish a movement command to /ta    rgetPos2."""
         self.current_target2 += increment
         command_msg = Float32()
         command_msg.data = self.current_target2
@@ -63,7 +65,6 @@ class executeCurveTurn:
         rospy.loginfo(f"Published to /targetPos2: {self.current_target2}")
 
     def align_turn_angle(self, goal):
-
         # when angle 0, create a vector down (-y)
         # When angle > 0 vector points to  (-x, -y) direction
         # Plot the vector, curr pos, and goal pos
@@ -78,8 +79,8 @@ class executeCurveTurn:
             return
 
         curr_x, curr_y = self.needle_tip_coords
-        # angle = np.radians(self.needle_tip_angle)  # Convert angle to radians
-        angle = np.radians(25)
+        angle = np.radians(self.needle_tip_angle)  # Convert angle to radians
+        # angle = np.radians(25)
         # Calculate the unit vector in the current needle direction
         if angle == 0:
             vector_x, vector_y = 0, -1  # Pointing directly downward
@@ -88,23 +89,48 @@ class executeCurveTurn:
 
         goal_x, goal_y = goal  # Unpack goal coordinates
 
-        # Plot current position, goal position, and direction vector
-        plt.figure(figsize=(6, 6))
-        plt.quiver(curr_x, curr_y, vector_x, vector_y, angles='xy', scale_units='xy', scale=1, color='r',
-                   label='Needle Direction')
-        plt.scatter(curr_x, curr_y, color='b', label='Current Position')
-        plt.scatter(goal_x, goal_y, color='g', label='Goal Position')
+        current_pos = (curr_x, curr_y)
+        goal_pos = (goal_x, goal_y)
+        current_vector = (vector_x, vector_y)
+        norm = self.calculate_norm_and_direction(
+                current_pos,
+                goal_pos,
+                current_vector
+        )
 
-        plt.xlim(min(curr_x, goal_x) - 1, max(curr_x, goal_x) + 1)
-        plt.ylim(min(curr_y, goal_y) - 1, max(curr_y, goal_y) + 1)
-        plt.xlabel('X Position')
-        plt.ylabel('Y Position')
-        plt.legend()
-        plt.grid()
-        plt.title('Needle Alignment Visualization')
-        plt.show()
+        if norm[0] > 1.0:
+            self.publish_move_command(1.0)
+            rospy.sleep(0.1)
+        return norm[0]
+    
+    def calculate_norm_and_direction(self, current_pos, goal_pos, current_vector):
+        # Convert inputs to numpy arrays
+        current_pos = np.array(current_pos)
+        goal_pos = np.array(goal_pos)
+        current_vector = np.array(current_vector)
 
-        # DANIEL TO DO, ELONGATE THE VECTOR, FIND THE MINIMUM DIST FROM GOAL TO VECTOR, MINIMIZE THAT BY TURNING
+        # Normalize current_vector
+        current_vector = current_vector / np.linalg.norm(current_vector)
+
+        # Calculate vector from current position to goal
+        vector_to_goal = goal_pos - current_pos
+
+        # Project vector_to_goal onto current_vector
+        projection = np.dot(vector_to_goal, current_vector) * current_vector
+
+        # Calculate the perpendicular component
+        perpendicular = vector_to_goal - projection
+
+        # The norm is the magnitude of the perpendicular component
+        norm_distance = np.linalg.norm(perpendicular)
+
+        # Calculate direction to goal
+        if np.linalg.norm(vector_to_goal) != 0:
+            direction_to_goal = vector_to_goal / np.linalg.norm(vector_to_goal)
+        else:
+            direction_to_goal = np.array([0, 0])  # If at goal, no direction
+
+        return norm_distance, direction_to_goal
 
 
 def main():
@@ -128,7 +154,23 @@ def main():
     rospy.loginfo(f"Position2: {turn_executor.position2}")
     rospy.loginfo(f"Position3: {turn_executor.position3}")
 
-    turn_executor.align_turn_angle(turn_executor.position1)
+    # Call the track_needle method to track the needle tip
+    rate = rospy.Rate(10)  # 10 Hz publishing rate
+
+    while not rospy.is_shutdown():
+        try:
+            norm = turn_executor.align_turn_angle(turn_executor.position1)
+            if norm > 1.0:
+                print(f"Tracked Needle Norm: {norm}")
+            else:
+                print("Turning finished")
+                print(f"Tracked Needle Norm: {norm}")
+                rospy.signal_shutdown('Finished turning!')
+                break
+        except Exception as e:
+            rospy.logerr(f"Error: {e}")
+            break
+        rate.sleep()
 
     rospy.spin()  # Keep the node running
 
