@@ -16,7 +16,7 @@ from collections import deque
 class trackNeedle(DubinsPathPlanner):
     def __init__(self, turn_radius, travel_distance, straight_step_distance, goal_threshold):
         # Initialize video capture once
-        self.video = cv2.VideoCapture(0)
+        self.video = cv2.VideoCapture(2)
         self.video.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.video.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 

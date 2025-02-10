@@ -57,7 +57,7 @@ class executeCurveTurn:
             rospy.logwarn("Received empty needle angle data!")
 
     def publish_move_command(self, increment):
-        """Publish a movement command to /ta    rgetPos2."""
+        """Publish a movement command to /targetPos2."""
         self.current_target2 += increment
         command_msg = Float32()
         command_msg.data = self.current_target2
@@ -80,7 +80,7 @@ class executeCurveTurn:
 
         curr_x, curr_y = self.needle_tip_coords
         angle = np.radians(self.needle_tip_angle)  # Convert angle to radians
-        # angle = np.radians(25)
+        
         # Calculate the unit vector in the current needle direction
         if angle == 0:
             vector_x, vector_y = 0, -1  # Pointing directly downward
