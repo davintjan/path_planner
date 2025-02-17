@@ -184,7 +184,7 @@ class trackNeedle(DubinsPathPlanner):
         plot_map = np.zeros_like(frame)
         for contour in contours:  # for debugging
             cv2.drawContours(plot_map, [contour], -1, (0, 255, 0), -1)
-
+            
         # Display the plot map
         # plt.imshow(plot_map)
         # plt.show()
@@ -266,7 +266,7 @@ class trackNeedle(DubinsPathPlanner):
             filtered_angle_msg = Float32MultiArray()
             filtered_angle_msg.data = [filtered_angle]
             self.pub_filtered_angle.publish(filtered_angle_msg)
-
+        
         print(f"Tracked Needle Angle Position: {angle}")
         print(f"Tracked Filtered Needle Angle Position: {filtered_angle}")
 
